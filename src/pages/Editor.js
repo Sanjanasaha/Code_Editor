@@ -13,9 +13,13 @@ import {
 
 const Editor = () => {
   const socketRef = useRef(null);
+  const codeRef=useRef(null);
   const location = useLocation();
   const { roomId } = useParams();
   const reactNavigator = useNavigate();
+
+  const [clients, setClients] = useState([]);
+
   useEffect(() => {
     const init = async () => {
       socketRef.current = await initSocket();
@@ -31,16 +35,51 @@ const Editor = () => {
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
         username: location.state?.username,
+    });
+
+      //Listening for joined event
+      socketRef.current.on(ACTIONS.JOINED,({clients,username,socketId})=>{
+        if(username!==location.state?.username){
+          toast.success(`${username} joined the room.`);
+          console.log(`${username} joined`);
+        }
+        setClients(clients);
+        socketRef.current.emit(ACTIONS.SYNC_CODE, {
+           code:codeRef.current,
+           socketId,
+        });
       });
+
+      //Listening for disconnected
+      socketRef.current.on(ACTIONS.DISCONNECTED,({socketId,username})=>{
+          toast.success(`${username} left the room.`);
+          setClients((prev)=>{
+            return prev.filter((client)=>client.socketId!==socketId);
+          });
+      });
+
     };
     init();
+    return ()=>{
+      socketRef.current.disconnect();
+      socketRef.current.off(ACTIONS.JOINED);
+      socketRef.current.off(ACTIONS.DISCONNECTED);
+    }
   }, []);
-  const [clients, setClients] = useState([
-    { socketId: 1, username: "Diya" },
-    { socketId: 2, username: "Riya" },
-    { socketId: 3, username: "Priya" },
-    { socketId: 4, username: "Shreya" },
-  ]);
+  
+  async function copyRoomId(){
+    try {
+      await navigator.clipboard.writeText(roomId);
+      toast.success("Room Id has been copied to your clipboard");
+    } catch (err) {
+      toast.error("Could not copy the Room Id");
+      console.error(err);
+    }
+  }
+
+  function leaveRoom(){
+    reactNavigator('/');
+  }
 
   if (!location.state) {
     return <Navigate to="/" />;
@@ -60,11 +99,17 @@ const Editor = () => {
             ))}
           </div>
         </div>
-        <button className="btn CopyBtn">Copy ROOM</button>
-        <button className="btn leaveBtn">Leave ROOM</button>
+        <button className="btn CopyBtn" onClick={copyRoomId}>Copy ROOM ID</button>
+        <button className="btn leaveBtn" onClick={leaveRoom}>Leave ROOM</button>
       </div>
       <div className="editorWrap">
-        <Edit />
+        <Edit 
+           socketRef={socketRef} 
+           roomId={roomId} 
+           onCodeChange={(code)=>{
+             codeRef.current=code;
+           }}
+        />
       </div>
     </div>
   );
