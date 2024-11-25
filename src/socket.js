@@ -10,5 +10,5 @@ export const initSocket = async () => {
 
   // console.log("Backend URL:", process.env.REACT_APP_BACKEND_URL);
 
-  return io(process.env.REACT_APP_BACKEND_URL, options);
+  return io("https://code-editor-backend-zrez.onrender.com", options);
 };
